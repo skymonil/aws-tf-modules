@@ -11,38 +11,41 @@ resource "aws_cloudwatch_log_group" "this" {
 
 resource "aws_ecs_task_definition" "this" {
   family                   = var.service.name
-  cpu                      = var.service.container.cpu
-  memory                   = var.service.container.memory
+  cpu                      = var.service.task.cpu
+  memory                   = var.service.task.memory
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
+
+  #  CPU/Memory locked to the Task level
+
 
   execution_role_arn = var.service.task.execution_role_arn
   task_role_arn      = var.service.task.task_role_arn
 
   container_definitions = jsonencode([
-    {
+    for container_name, config in var.service.containers : {
       name      = var.service.container.name
       image     = var.service.container.image
       cpu       = var.service.container.cpu
       memory    = var.service.container.memory
       essential = true
 
-      portMappings = var.service.container.port != null ? [
+      portMappings = config.port != null ? [
         {
-          containerPort = var.service.container.port
+          containerPort = config.port
           protocol      = "tcp"
         }
       ] : []
 
-      environment = local.container_environment
-      secrets     = local.container_secrets
+      environment = [for k, v in config.environment : { name = k, value = v }]
+      secrets     = [for k, v in config.secrets : { name = k, valueFrom = v }]
 
-      logConfiguration = var.service.container.log_group_name != null ? {
+      logConfiguration = config.log_group_name != null ? {
         logDriver = "awslogs"
         options = {
-          "awslogs-group"         = var.service.container.log_group_name # Safer reference
+          "awslogs-group"         = config.log_group_name
           "awslogs-region"        = data.aws_region.current.name
-          "awslogs-stream-prefix" = var.service.name
+          "awslogs-stream-prefix" = container_name
         }
       } : null
     }
@@ -57,6 +60,20 @@ resource "aws_ecs_service" "this" {
   task_definition  = aws_ecs_task_definition.this.arn
   desired_count    = var.service.autoscaling.min_capacity
   platform_version = var.service.task.platform_version
+
+  #  Deployment configuration
+  deployment_minimum_healthy_percent = var.service.deployment.min_healthy_percent
+  deployment_maximum_percent         = var.service.deployment.max_percent
+
+  #  Exec and Grace Period
+  enable_execute_command            = var.service.enable_execute_command
+  health_check_grace_period_seconds = var.service.load_balancer != null ? var.service.health_check_grace_period_seconds : 0
+
+  #  Circuit Breaker
+  deployment_circuit_breaker {
+    enable   = var.service.deployment.circuit_breaker_enable
+    rollback = var.service.deployment.circuit_breaker_rollback
+  }
 
   dynamic "capacity_provider_strategy" {
     for_each = var.service.capacity_provider_strategy
@@ -82,7 +99,7 @@ resource "aws_ecs_service" "this" {
     }
   }
 
-  enable_execute_command = true
+
 
   # NOTE: Ignoring task_definition is standard IF your CI/CD pipeline (like GitHub Actions) 
   # is responsible for deploying new images. If Terraform manages image versions, remove this.

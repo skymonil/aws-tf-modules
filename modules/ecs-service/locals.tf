@@ -11,7 +11,7 @@ locals {
   #  FIX 8: Extract Cluster Name dynamically to avoid passing it twice
   cluster_name = element(split("/", var.service.cluster_arn), 1)
 
-   # Find the primary container's log group name safely
+  # Find the primary container's log group name safely
   primary_log_group = values(var.service.containers)[0].log_group_name
 
   container_environment = [

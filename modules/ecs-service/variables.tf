@@ -67,9 +67,9 @@ variable "service" {
 
     autoscaling = optional(object({
 
-      enabled = optional(bool, false)
-      min_capacity = optional(number, 1)
-      max_capacity = optional(number, 2)
+      enabled       = optional(bool, false)
+      min_capacity  = optional(number, 1)
+      max_capacity  = optional(number, 2)
       cpu_target    = optional(number, 70)
       memory_target = optional(number, 75)
 
