@@ -1,94 +1,141 @@
-This `README.md` is designed to showcase the high-level architecture decisions you made, specifically the **Map-Based Subnetting** and the **Dynamic NAT Gateway** logic. This level of documentation is exactly what a hiring manager at a company like Drona Pay looks for.
+# AWS Production VPC Terraform Module
 
------
+A flexible and production-ready Terraform module for provisioning a multi-tier AWS Virtual Private Cloud (VPC).
 
-````markdown
-# AWS Production VPC Module
+This module avoids fragile index-based subnet configuration and instead uses a **map-based subnet design**, ensuring Availability Zones (AZs) and CIDR blocks always remain correctly aligned.
 
-A highly flexible and robust Terraform module for provisioning a multi-tier AWS Virtual Private Cloud (VPC). 
-
-This module moves away from fragile index-based lists and uses a **strictly typed Map-Based configuration**. This ensures that Availability Zones (AZs) and their respective CIDR blocks are always perfectly aligned, eliminating the risk of "Index Shifts" during infrastructure updates.
-
-## ✨ Features
-
-* **Map-Based Subnetting:** Uses a `map(object)` to define subnets, making the relationship between AZs and CIDR blocks explicit and unbreakable.
-* **Dynamic NAT Topologies:** * `single_nat_gateway = true`: Deploys one NAT Gateway for the entire VPC (Ideal for cost-saving in Dev/Staging).
-  * `single_nat_gateway = false`: Deploys a NAT Gateway per AZ (High Availability for Production).
-* **Automatic AZ Discovery:** Dynamically extracts and sorts Availability Zones from the input map keys to maintain state consistency.
-* **Modern Routing:** Decouples route tables from routes to allow for "NAT-less" private subnets without breaking Terraform associations.
-* **Rich Outputs:** Exports subnets as AZ-mapped objects, allowing downstream modules (like EKS or RDS) to pick specific subnets by AZ name.
-* **Standardized Tagging:** Automatically merges global tags with resource-specific naming conventions.
+The module supports both **cost-optimized startup deployments** and **highly available production architectures** through configurable NAT topology.
 
 ---
 
-## 🚀 Usage Example
+## Key Features
 
-### Production Configuration (High Availability)
+### Map-Based Subnet Configuration
+Subnets are defined using a structured map instead of lists, eliminating index mismatch errors and improving readability.
+
+### Flexible NAT Gateway Topology
+Supports both startup-friendly and production-grade network architecture:
+
+* `single_nat_gateway = true`
+  * One NAT Gateway shared across all AZs
+  * Lower cost
+  * Suitable for dev or staging
+
+* `single_nat_gateway = false`
+  * One NAT Gateway per AZ
+  * High availability
+  * Production-ready architecture
+
+### Deterministic AZ Ordering
+Uses sorted AZ keys internally to ensure stable Terraform state and prevent unnecessary resource recreation.
+
+### Decoupled Route Tables
+Route tables and routes are defined independently, enabling private subnets to exist with or without NAT gateways.
+
+### Rich Outputs
+Exports subnet IDs as structured maps keyed by AZ, allowing downstream modules (EKS, ECS, RDS) to reference specific subnets easily.
+
+### Standardized Tagging
+Automatically merges global tags with resource-specific naming conventions.
+
+---
+
+## Architecture
+
+Example architecture created by this module:
+
+
+---
+
+## Usage Example
+
+### Production Configuration (Multi-AZ HA)
+
 ```hcl
 module "vpc" {
+
   source = "../../modules/vpc"
 
-  vpc_name           = "dronapay-prod-vpc"
-  environment        = "prod"
-  region             = "ap-south-1"
-  vpc_cidr_block     = "10.0.0.0/16"
-  
-  single_nat_gateway = false # NAT per AZ
+  vpc_name       = "educore-prod-vpc"
+  vpc_cidr_block = "10.0.0.0/16"
+
   enable_nat_gateway = true
+  single_nat_gateway = false
 
   subnet_config = {
-    "ap-south-1a" = {
+
+    ap-south-1a = {
       public_cidr  = "10.0.1.0/24"
       private_cidr = "10.0.11.0/24"
     }
-    "ap-south-1b" = {
+
+    ap-south-1b = {
       public_cidr  = "10.0.2.0/24"
       private_cidr = "10.0.12.0/24"
     }
+
   }
+
+  tags = {
+    Project     = "educore"
+    Environment = "prod"
+  }
+
 }
+
 ````
 
------
+Config For Sartups
 
-## 📋 Requirements
+```hcl
+module "vpc" {
 
-| Name | Version |
-|------|---------|
-| \<a name="requirement\_terraform"\>\</a\> [terraform](https://www.google.com/search?q=%23requirement_terraform) | \>= 1.5.0 |
-| \<a name="requirement\_aws"\>\</a\> [aws](https://www.google.com/search?q=%23requirement_aws) | \~\> 5.0 |
+  source = "../../modules/vpc"
 
------
+  vpc_name       = "educore-dev-vpc"
+  vpc_cidr_block = "10.1.0.0/16"
 
-## 📥 Inputs
+  enable_nat_gateway = true
+  single_nat_gateway = true
 
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| \<a name="input\_vpc\_cidr\_block"\>\</a\> [vpc\_cidr\_block](https://www.google.com/search?q=%23input_vpc_cidr_block) | CIDR for the VPC (Validation: must be /24 or smaller) | `string` | n/a | yes |
-| \<a name="input\_subnet\_config"\>\</a\> [subnet\_config](https://www.google.com/search?q=%23input_subnet_config) | Map of AZ keys to public/private CIDR objects | `map(object)` | n/a | yes |
-| \<a name="input\_vpc\_name"\>\</a\> [vpc\_name](https://www.google.com/search?q=%23input_vpc_name) | Name prefix for all resources | `string` | n/a | yes |
-| \<a name="input\_single\_nat\_gateway"\>\</a\> [single\_nat\_gateway](https://www.google.com/search?q=%23input_single_nat_gateway) | If true, all private subnets share a single NAT | `bool` | `false` | no |
-| \<a name="input\_enable\_nat\_gateway"\>\</a\> [enable\_nat\_gateway](https://www.google.com/search?q=%23input_enable_nat_gateway) | Toggle for NAT Gateway provisioning | `bool` | `true` | no |
-| \<a name="input\_tags"\>\</a\> [tags](https://www.google.com/search?q=%23input_tags) | Map of extra tags to apply to resources | `map(string)` | `{}` | no |
+  subnet_config = {
 
------
+    ap-south-1a = {
+      public_cidr  = "10.1.1.0/24"
+      private_cidr = "10.1.11.0/24"
+    }
 
-## 📤 Outputs
+  }
 
-| Name | Description |
-|------|-------------|
-| \<a name="output\_vpc\_id"\>\</a\> [vpc\_id](https://www.google.com/search?q=%23output_vpc_id) | The ID of the VPC. |
-| \<a name="output\_subnets"\>\</a\> [subnets](https://www.google.com/search?q=%23output_subnets) | A rich map containing `public` and `private` keys, each holding a map of AZ-to-SubnetID. |
-| \<a name="output\_private\_subnet\_ids"\>\</a\> [private\_subnet\_ids](https://www.google.com/search?q=%23output_private_subnet_ids) | A flat list of private subnet IDs for easy consumption. |
+}
+````
+### Inputs
 
------
+| Name               | Description               | Type        | Required |
+| ------------------ | ------------------------- | ----------- | -------- |
+| vpc_name           | Name prefix for resources | string      | yes      |
+| vpc_cidr_block     | CIDR block for VPC        | string      | yes      |
+| subnet_config      | Map of AZ to subnet CIDRs | map(object) | yes      |
+| enable_nat_gateway | Enable NAT gateway        | bool        | no       |
+| single_nat_gateway | Use one NAT for all AZs   | bool        | no       |
+| tags               | Additional resource tags  | map(string) | no       |
 
-## 🛠️ Design Note: Sorting AZs
+subnet_config = {
 
-This module uses `sort(keys(var.subnet_config))` within its locals. This is a critical safety feature. Because maps in HCL are unordered, sorting the keys ensures that if you use `single_nat_gateway`, Terraform always picks the same AZ (alphabetically first) to host the gateway, preventing unnecessary "destroy and recreate" cycles on your NAT EIPs.
+  ap-south-1a = {
 
-```
+    public_cidr  = string
+    private_cidr = string
 
-***
+  }
 
-```
+}
+
+### Outputs
+
+| Name               | Description                     |
+| ------------------ | ------------------------------- |
+| vpc_id             | ID of the VPC                   |
+| public_subnets     | map of AZ to public subnet IDs  |
+| private_subnets    | map of AZ to private subnet IDs |
+| private_subnet_ids | list of private subnet IDs      |
