@@ -15,3 +15,13 @@ variable "policy_arns" {
   type = list(string)
 
 }
+
+variable "tags" {
+
+  description = "Tags applied to policies"
+
+  type = map(string)
+
+  default = {}
+
+}

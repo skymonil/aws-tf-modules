@@ -5,7 +5,7 @@ locals {
     {
 
       ManagedBy = "Terraform"
-      Module    = ""
+      Module    = "s3-bucket"
 
     },
 

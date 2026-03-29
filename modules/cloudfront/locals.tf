@@ -5,7 +5,7 @@ locals {
     {
 
       ManagedBy = "Terraform"
-      Module    = ""
+      Module    = "Cloudfront"
 
     },
 
