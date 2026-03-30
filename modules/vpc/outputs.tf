@@ -3,23 +3,41 @@ output "vpc_id" {
   value       = aws_vpc.vpc.id
 }
 
-# Extracts the IDs from the for_each map into a flat list
 output "public_subnet_ids" {
-  description = "List of public subnet IDs"
-  value       = [for subnet in aws_subnet.public_subnet : subnet.id]
+  description = "Flat list of public subnet IDs"
+  value       = [for subnet in aws_subnet.public : subnet.id]
 }
 
 output "private_subnet_ids" {
-  description = "List of private subnet IDs"
-  value       = [for subnet in aws_subnet.private_subnet : subnet.id]
+  description = "Flat list of private subnet IDs"
+  value       = [for subnet in aws_subnet.private : subnet.id]
 }
 
+output "database_subnet_ids" {
+  description = "Flat list of database subnet IDs"
+  value       = [for subnet in aws_subnet.database : subnet.id]
+}
 
-# ✅ FIX 12: Richer Outputs Using Maps
 output "subnets" {
-  description = "A mapped object containing public and private subnet IDs mapped by AZ"
+  description = "Rich map of subnets mapped by AZ, containing ID and CIDR blocks"
   value = {
-    public  = { for k, v in aws_subnet.public_subnet : k => v.id }
-    private = { for k, v in aws_subnet.private_subnet : k => v.id }
+    public = {
+      for az, subnet in aws_subnet.public : az => {
+        id   = subnet.id
+        cidr = subnet.cidr_block
+      }
+    }
+    private = {
+      for az, subnet in aws_subnet.private : az => {
+        id   = subnet.id
+        cidr = subnet.cidr_block
+      }
+    }
+    database = {
+      for az, subnet in aws_subnet.database : az => {
+        id   = subnet.id
+        cidr = subnet.cidr_block
+      }
+    }
   }
 }
