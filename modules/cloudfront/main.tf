@@ -36,7 +36,8 @@ resource "aws_cloudfront_distribution" "this" {
   is_ipv6_enabled     = true
   comment             = "CDN for ${var.project_name}"
   default_root_object = "index.html"
-  
+  http_version = "http2and3"
+
  # Reference the object fields
   web_acl_id          = var.distribution_config.waf_arn
   aliases             = var.distribution_config.aliases
